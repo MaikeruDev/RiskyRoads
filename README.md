@@ -5,6 +5,7 @@ Discover the thrill with RiskyRoads! This Python-based tool assists driving enth
 ## Table of Contents
 
 - [Installation](#installation)
+- [API Key Configuration](#api-key-configuration)
 - [Usage](#usage)
 - [Features](#features)
 - [Contributing](#contributing)
@@ -24,6 +25,20 @@ git clone https://github.com/MaikeruDev/RiskyRoads.git
 ```bash
 cd RiskyRoads
 pip install -r requirements.txt
+```
+## API Key Configuration
+
+Before running the program, ensure you have a Google Cloud API key and have activated the Geolocation API on your Google Cloud project. 
+
+Replace `{YOUR_API_KEY}` in the source code with your actual API key.
+
+⚠️ **Important**: Always keep your API keys confidential. Avoid exposing them in public repositories.
+
+## Usage 
+
+Run the program and follow the on-screen prompts:
+```bash
+python riskyroads.py
 ```
 
 ## Usage 
