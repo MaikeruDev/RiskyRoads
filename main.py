@@ -1,8 +1,26 @@
 import json
 import osmnx as ox
 import requests
+import numpy as np
 
 GOOGLE_ELEVATION_API_ENDPOINT = "https://maps.googleapis.com/maps/api/elevation/json?locations={lat},{lon}&key={YOUR_API_KEY}"
+
+def calculate_angle(p0, p1, p2):
+    a = np.array(p0)
+    b = np.array(p1)
+    c = np.array(p2)
+
+    ba = a - b
+    bc = c - b
+
+    cosine_angle = np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc))
+    
+    # Clamp the value to the domain of arccos
+    cosine_angle = np.clip(cosine_angle, -1, 1)
+    
+    angle = np.arccos(cosine_angle)
+    
+    return np.degrees(angle)
 
 def get_elevation(lat, lon):
     url = GOOGLE_ELEVATION_API_ENDPOINT.format(lat=lat, lon=lon)
@@ -13,15 +31,39 @@ def get_elevation(lat, lon):
     return elevation
 
 def find_drifting_corners(location):
-    G = ox.graph_from_address(location, dist=radius, network_type='drive')  # Increased distance to 5km for broader search
-
-    non_roundabouts = [x for x, y in G.nodes(data=True) if y.get('highway') != 'roundabout']
-
-    mountain_nodes = [node for node in non_roundabouts if get_elevation(G.nodes[node]['y'], G.nodes[node]['x']) > min_elevation_threshold]
-
-    best_corners = mountain_nodes[:count]
+    G = ox.graph_from_address(location, dist=radius, network_type='drive')
+     
+    main_roads = ['primary', 'secondary', 'tertiary', 'trunk']
+ 
+    main_edges = [(u, v, k, data) for u, v, k, data in G.edges(keys=True, data=True) if data['highway'] in main_roads]
+ 
+    curvy_sequences = []
     
-    return best_corners, G
+    count_with_geometry = 0
+
+    visited_corners = set()
+        
+    for u, v, k, data in main_edges: 
+        if 'geometry' in data:
+            count_with_geometry += 1
+            coords = list(data['geometry'].coords)
+            for i in range(1, len(coords) - 1):
+                p0 = coords[i-1]
+                p1 = coords[i]
+                p2 = coords[i+1]
+
+                angle = calculate_angle(p0, p1, p2)
+                
+                if 40 <= angle <= 140 and p1 not in visited_corners:
+                    visited_corners.add(p1)
+                    curvy_sequences.append((v, p1[::-1], angle))
+
+    best_curves = sorted(curvy_sequences, key=lambda x: x[2], reverse=True)[:count]
+    
+    print(f"Edges with geometry: {count_with_geometry}")
+    print(f"Identified curves: {len(curvy_sequences)}")
+     
+    return [(curve[0], curve[1]) for curve in best_curves], G
 
 def generate_google_maps_url(lat, lon):
     return f"https://www.google.com/maps/?q={lat},{lon}"
@@ -33,10 +75,9 @@ if __name__ == '__main__':
     print("This may take a while...")
     
     corners, G = find_drifting_corners(location)
-    
-    print("Top " + str(count) + " drifting corners near", location)
-    for corner in corners:
-        lat, lon = G.nodes[corner]['y'], G.nodes[corner]['x']
-        print(generate_google_maps_url(lat, lon))
 
+    print("Top " + str(count) + " drifting corners near", location)
+    for node, (lat, lon) in corners:
+        print(generate_google_maps_url(lat, lon))
+  
     input("")
